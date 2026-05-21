@@ -221,7 +221,15 @@ func GetStudentResults(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(results)
+	type ResultsResponse struct {
+		Application models.Application `json:"application"`
+		Responses   []ResultWithTitle  `json:"responses"`
+	}
+
+	return c.JSON(ResultsResponse{
+		Application: app,
+		Responses:   results,
+	})
 }
 
 func GetDetailedResponse(c *fiber.Ctx) error {
