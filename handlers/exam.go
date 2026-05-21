@@ -193,12 +193,12 @@ func GetStudentResults(c *fiber.Ctx) error {
 
 	// Verify application exists first (authentication)
 	var app models.Application
-	if err := db.DB.Where("email = ? AND phone = ?", email, phone).First(&app).Error; err != nil {
+	if err := db.DB.Where("LOWER(email) = LOWER(?) AND phone = ?", email, phone).First(&app).Error; err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "No registration found with these credentials. Please register for Super 40 first."})
 	}
 
 	var responses []models.ExamResponse
-	if err := db.DB.Where("student_id = ?", email).Order("created_at desc").Find(&responses).Error; err != nil {
+	if err := db.DB.Where("LOWER(student_id) = LOWER(?)", email).Order("created_at desc").Find(&responses).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch results"})
 	}
 
