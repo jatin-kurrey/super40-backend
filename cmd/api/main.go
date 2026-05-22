@@ -63,6 +63,9 @@ func main() {
 	// Admin (Protected)
 	admin := api.Group("/admin", middleware.AuthRequired)
 
+	// Admin Settings & Security
+	admin.Put("/profile/password", handlers.ChangeSelfPassword)
+
 	// Applications Management
 	admin.Get("/applications", handlers.GetApplications)
 	admin.Put("/applications/:id/status", handlers.UpdateApplicationStatus)

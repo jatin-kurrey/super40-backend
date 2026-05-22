@@ -92,3 +92,46 @@ func CreateInitialAdmin(c *fiber.Ctx) error {
 
 	return c.Status(201).JSON(fiber.Map{"message": "Initial admin created", "username": admin.Username, "password": password})
 }
+
+type UpdatePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+func ChangeSelfPassword(c *fiber.Ctx) error {
+	username := c.Locals("username").(string)
+
+	var req UpdatePasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot parse JSON"})
+	}
+
+	if req.NewPassword == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "New password is required"})
+	}
+
+	if len(req.NewPassword) < 6 {
+		return c.Status(400).JSON(fiber.Map{"error": "Password must be at least 6 characters long"})
+	}
+
+	var admin models.Admin
+	if err := db.DB.Where("username = ?", username).First(&admin).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Admin user not found"})
+	}
+
+	if !CheckPasswordHash(req.CurrentPassword, admin.PasswordHash) {
+		return c.Status(400).JSON(fiber.Map{"error": "Incorrect current password"})
+	}
+
+	newHash, err := HashPassword(req.NewPassword)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to hash new password"})
+	}
+
+	admin.PasswordHash = newHash
+	if err := db.DB.Save(&admin).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update password"})
+	}
+
+	return c.JSON(fiber.Map{"message": "Password changed successfully"})
+}
