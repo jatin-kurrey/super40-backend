@@ -9,7 +9,6 @@ import (
 	"super40-backend/middleware"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/joho/godotenv"
 )
@@ -30,13 +29,27 @@ func main() {
 	// Initialize Fiber app
 	app := fiber.New()
 
+	// Serve uploaded files statically
+	app.Static("/uploads", "./uploads")
+
 	// Global Middlewares
 	app.Use(logger.New())
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
-	}))
+	app.Use(func(c *fiber.Ctx) error {
+		origin := c.Get("Origin")
+		if origin != "" {
+			c.Set("Access-Control-Allow-Origin", origin)
+		} else {
+			c.Set("Access-Control-Allow-Origin", "*")
+		}
+		c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With, X-CSRF-Token")
+		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH")
+		c.Set("Access-Control-Allow-Credentials", "true")
+
+		if c.Method() == "OPTIONS" {
+			return c.SendStatus(204)
+		}
+		return c.Next()
+	})
 
 	// Health Check
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -80,9 +93,24 @@ func main() {
 	admin.Post("/exams/:id/activate", handlers.ActivateExam)
 	admin.Put("/settings", handlers.UpdateSetting)
 
-	// File Upload Placeholder to prevent frontend failures
 	admin.Post("/upload", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"url": "/uploads/placeholder.jpg"})
+		file, err := c.FormFile("file")
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Failed to upload file"})
+		}
+		
+		// Create uploads folder if it doesn't exist
+		if _, err := os.Stat("uploads"); os.IsNotExist(err) {
+			os.Mkdir("uploads", 0755)
+		}
+		
+		filePath := "uploads/" + file.Filename
+		if err := c.SaveFile(file, filePath); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to save file"})
+		}
+		
+		// Return full dynamic URL pointing to local server
+		return c.JSON(fiber.Map{"url": "http://localhost:8081/uploads/" + file.Filename})
 	})
 
 	// Start Listening
